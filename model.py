@@ -58,7 +58,7 @@ def get_model():
     # TODO: params
     n_channels_dat = 129
     sample_rate = 20000.
-    n_samples_waveforms = 30
+    n_samples_waveforms = (0, 40)
 
     traces = read_dat(filenames['traces'],
                       n_channels=n_channels_dat,
