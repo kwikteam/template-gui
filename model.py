@@ -90,7 +90,6 @@ def get_model():
     assert channel_positions.shape == (n_channels, 2)
 
     model = Bunch()
-    model.path = ''
     model.n_channels = n_channels
     # Take dead channels into account.
     traces = _concatenate_virtual_arrays([traces], channel_mapping)

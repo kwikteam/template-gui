@@ -35,6 +35,11 @@ gui = create_gui(name='TemplateGUI',
                  # subtitle=model.kwik_path,
                  model=model,
                  plugins=plugins,
+                 state={'ClusterView': {
+                        'quality': 'n_spikes',
+                        # 'similarity': 'n_spikes',
+                        }
+                        },
                  )
 
 # # Save.
