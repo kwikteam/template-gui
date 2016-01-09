@@ -94,6 +94,7 @@ def get_model():
     # Take dead channels into account.
     traces = _concatenate_virtual_arrays([traces], channel_mapping)
     model.n_spikes = n_spikes
+    model.amplitudes = amplitudes
     model.sample_rate = sample_rate
     model.duration = n_samples_t / float(model.sample_rate)
     model.spike_times = spike_samples / float(model.sample_rate)
