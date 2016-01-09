@@ -28,12 +28,6 @@ logging.getLogger(__name__).setLevel('DEBUG')
 
 class AmplitudeView(ManualClusteringView):
     _default_marker_size = 3.
-    # _amplitude_scaling = 1.
-
-    # default_shortcuts = {
-    #     'increase': 'ctrl++',
-    #     'decrease': 'ctrl+-',
-    # }
 
     def __init__(self,
                  amplitudes=None,  # function clusters: Bunch(times, amplis)
@@ -88,30 +82,6 @@ class AmplitudeView(ManualClusteringView):
                          data_bounds=self.data_bounds,
                          size=ms * np.ones(n_spikes),
                          )
-
-    def attach(self, gui):
-        """Attach the view to the GUI."""
-        super(AmplitudeView, self).attach(gui)
-        # self.actions.add(self.increase)
-        # self.actions.add(self.decrease)
-
-    # def increase(self):
-    #     """Increase the scaling of the features."""
-    #     self.feature_scaling *= 1.2
-    #     self.on_select()
-
-    # def decrease(self):
-    #     """Decrease the scaling of the features."""
-    #     self.feature_scaling /= 1.2
-    #     self.on_select()
-
-    # @property
-    # def feature_scaling(self):
-    #     return self._feature_scaling
-
-    # @feature_scaling.setter
-    # def feature_scaling(self, value):
-    #     self._feature_scaling = value
 
 
 class AmplitudeViewPlugin(IPlugin):
@@ -177,7 +147,7 @@ gui = create_gui(name='TemplateGUI',
                  plugins=plugins,
                  state={'ClusterView': {
                         'quality': 'n_spikes',
-                        # 'similarity': 'n_spikes',
+                        'similarity': 'sim_templates',
                         }
                         },
                  )
