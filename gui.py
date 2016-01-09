@@ -208,7 +208,7 @@ gui = create_gui(name='TemplateGUI',
                  plugins=plugins,
                  state={'ClusterView': {
                         'quality': 'n_spikes',
-                        'similarity': 'sim_templates',
+                        # 'similarity': 'sim_templates',
                         }
                         },
                  )
