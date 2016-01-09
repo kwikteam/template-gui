@@ -34,7 +34,6 @@ def read_mat(name):
 def get_masks(templates):
     n_channels, n_samples_templates, n_templates = templates.shape
     templates = np.abs(templates)
-    templates[np.isnan(templates)] = 0
     masks = np.zeros((n_templates, n_channels))
     m = templates.max(axis=1)
     m = m > .05 * m.max(axis=0)
@@ -80,6 +79,7 @@ def get_model():
     assert spike_samples.shape == (n_spikes,)
 
     templates = read_mat('templates')
+    templates[np.isnan(templates)] = 0
     n_channels, n_samples_templates, n_templates = templates.shape
 
     channel_mapping = read_mat('channel_mapping').squeeze()
@@ -94,7 +94,16 @@ def get_model():
     # Take dead channels into account.
     traces = _concatenate_virtual_arrays([traces], channel_mapping)
     model.n_spikes = n_spikes
+
+    # Amplitudes
     model.amplitudes = amplitudes
+    model.amplitudes_lim = np.percentile(model.amplitudes, 95)
+
+    # Templates
+    model.templates = templates
+    model.n_samples_templates = n_samples_templates
+    model.template_lim = np.max(np.abs(model.templates))
+
     model.sample_rate = sample_rate
     model.duration = n_samples_t / float(model.sample_rate)
     model.spike_times = spike_samples / float(model.sample_rate)
@@ -124,7 +133,8 @@ def get_model():
     waveforms = SpikeLoader(waveforms, spike_samples)
     model.waveforms = waveforms
 
-    model.masks = MaskLoader(get_masks(templates), spike_clusters)
+    model.template_masks = get_masks(templates)
+    model.masks = MaskLoader(model.template_masks, spike_clusters)
     model.features = None
     model.features_masks = None
 

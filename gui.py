@@ -14,7 +14,10 @@ import numpy as np
 from phy import IPlugin
 from phy.utils import Bunch
 from phy.io.array import _index_of, _spikes_in_clusters
-from phy.cluster.manual.views import ManualClusteringView, _get_color
+from phy.cluster.manual.views import (ManualClusteringView,
+                                      WaveformView,
+                                      _get_color,
+                                      )
 from phy.gui import create_app, create_gui, run_app
 
 from model import get_model
@@ -103,23 +106,80 @@ class AmplitudeViewPlugin(IPlugin):
             d.amplitudes = model.amplitudes[spike_ids]
             return d
 
-        alim = np.percentile(model.amplitudes, 95)
-
         view = AmplitudeView(amplitudes=cs.amplitudes,
-                             amplitudes_lim=alim,
+                             amplitudes_lim=model.amplitudes_lim,
                              duration=model.duration,
                              )
         view.attach(gui)
 
-        # fs, = state.get_view_params('AmplitudeView', 'amplitude_scaling')
-        # if fs:
-        #     view.amplitude_scaling = fs
 
-        # @gui.connect_
-        # def on_close():
-        #     # Save the box bounds.
-        #     state.set_view_params(view,
-        #                           amplitude_scaling=view.amplitude_scaling)
+# -----------------------------------------------------------------------------
+# Template view
+# -----------------------------------------------------------------------------
+
+class TemplateView(WaveformView):
+    default_shortcuts = {
+        # 'toggle_waveform_overlap': 'o',
+
+        # Box scaling.
+        'widen': 'ctrl+shift+right',
+        'narrow': 'ctrl+shift+left',
+        'increase': 'ctrl+shift+up',
+        'decrease': 'ctrl+shift+down',
+
+        # Probe scaling.
+        'extend_horizontally': 'shift+alt+right',
+        'shrink_horizontally': 'shift+alt+left',
+        'extend_vertically': 'shift+alt+up',
+        'shrink_vertically': 'shift+alt+down',
+    }
+
+
+class TemplateViewPlugin(IPlugin):
+    def attach_to_gui(self, gui):
+        state = gui.state
+        model = gui.request('model')
+        bs, ps, ov = state.get_view_params('TemplateView',
+                                           'box_scaling',
+                                           'probe_scaling',
+                                           'overlap',
+                                           )
+        cs = gui.request('cluster_store')
+
+        @cs.add(concat=True)
+        def templates(cluster_id):
+            d = Bunch()
+            d.spike_ids = np.array([0])
+            d.spike_clusters = np.array([cluster_id])
+            d.waveforms = model.templates[:, :, [cluster_id]]. \
+                transpose((2, 1, 0))
+            d.masks = model.template_masks[[cluster_id], :]
+            assert (d.spike_ids.shape[0] ==
+                    d.waveforms.shape[0] ==
+                    d.masks.shape[0] == 1)
+            return d
+
+        assert cs  # We need the cluster store to retrieve the data.
+        view = TemplateView(waveforms_masks=cs.templates,
+                            channel_positions=model.channel_positions,
+                            n_samples=model.n_samples_templates,
+                            box_scaling=bs,
+                            probe_scaling=ps,
+                            waveform_lim=model.template_lim,
+                            )
+        view.attach(gui)
+
+        if ov is not None:
+            view.overlap = ov
+
+        @gui.connect_
+        def on_close():
+            # Save the box bounds.
+            state.set_view_params(view,
+                                  box_scaling=tuple(view.box_scaling),
+                                  probe_scaling=tuple(view.probe_scaling),
+                                  overlap=view.overlap,
+                                  )
 
 
 # -----------------------------------------------------------------------------
@@ -134,6 +194,8 @@ plugins = ['ContextPlugin',
            'ClusterStorePlugin',
            'ManualClusteringPlugin',
            'WaveformViewPlugin',
+           # 'TemplateViewPlugin',  # not very useful, better to put templates
+                                    # the waveform view  # noaq
            'AmplitudeViewPlugin',
            'CorrelogramViewPlugin',
            'TraceViewPlugin',
@@ -142,7 +204,6 @@ plugins = ['ContextPlugin',
 
 # Create the GUI.
 gui = create_gui(name='TemplateGUI',
-                 # subtitle=model.kwik_path,
                  model=model,
                  plugins=plugins,
                  state={'ClusterView': {
