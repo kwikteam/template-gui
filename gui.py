@@ -213,6 +213,42 @@ gui = create_gui(name='TemplateGUI',
                         },
                  )
 
+cs = gui.request('cluster_store')
+selector = gui.request('selector')
+
+
+def select(cluster_id, n=None):
+    assert isinstance(cluster_id, int)
+    assert cluster_id >= 0
+    return selector.select_spikes([cluster_id], max_n_spikes_per_cluster=n)
+
+
+def _get_data(**kwargs):
+    kwargs['spike_clusters'] = model.spike_clusters[kwargs['spike_ids']]
+    return Bunch(**kwargs)
+
+
+@cs.add(concat=True)
+def waveforms_masks(cluster_id):
+    spike_ids = select(cluster_id, 100)
+    waveforms = np.atleast_2d(model.waveforms[spike_ids])
+    assert waveforms.ndim == 3
+    masks = np.atleast_2d(model.masks[spike_ids])
+    assert masks.ndim == 2
+    # Ensure that both arrays have the same number of channels.
+    assert masks.shape[1] == waveforms.shape[2]
+
+    # Templates
+    mw = model.templates[:, :, [cluster_id]].transpose((2, 1, 0))
+    mm = model.template_masks[[cluster_id], :]
+
+    return _get_data(spike_ids=spike_ids,
+                     waveforms=waveforms,
+                     masks=masks,
+                     mean_waveforms=mw,
+                     mean_masks=mm,
+                     )
+
 
 # Save.
 @gui.connect_
