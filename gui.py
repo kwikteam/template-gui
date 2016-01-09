@@ -23,7 +23,7 @@ create_app()
 plugins = ['ContextPlugin',
            'ClusterStorePlugin',
            'ManualClusteringPlugin',
-           # 'WaveformViewPlugin',
+           'WaveformViewPlugin',
            # 'FeatureViewPlugin',
            'CorrelogramViewPlugin',
            'TraceViewPlugin',

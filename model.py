@@ -4,6 +4,7 @@ import numpy as np
 import scipy.io as sio
 
 from phy.traces import SpikeLoader, WaveformLoader
+from phy.traces.filter import apply_filter, bandpass_filter
 from phy.io.array import _spikes_per_cluster
 from phy.utils import Bunch
 from phycontrib.kwik.model import _concatenate_virtual_arrays
@@ -103,13 +104,26 @@ def get_model():
     model.channel_positions = channel_positions
     model.traces = traces
 
+    # Filter the waveforms.
+    order = 3
+    filter_margin = order * 3
+    b_filter = bandpass_filter(rate=sample_rate,
+                               low=500.,
+                               high=sample_rate * .475,
+                               order=order)
+
+    def the_filter(x, axis=0):
+        return apply_filter(x, b_filter, axis=axis)
+
     # Fetch waveforms from traces.
     waveforms = WaveformLoader(traces=traces,
                                n_samples_waveforms=n_samples_waveforms,
-                               # channels=channel_mapping,
+                               filter=the_filter,
+                               filter_margin=filter_margin,
                                )
     waveforms = SpikeLoader(waveforms, spike_samples)
     model.waveforms = waveforms
+
     model.masks = MaskLoader(get_masks(templates), spike_clusters)
     model.features = None
     model.features_masks = None
