@@ -11,7 +11,6 @@ import logging
 
 import numpy as np
 
-from phy import IPlugin
 from phy.utils import Bunch
 from phy.io.array import _index_of, _spikes_in_clusters
 from phy.cluster.manual.views import (ManualClusteringView,
@@ -19,8 +18,22 @@ from phy.cluster.manual.views import (ManualClusteringView,
                                       _get_color,
                                       )
 from phy.gui import create_app, create_gui, run_app
+from phycontrib.kwik_gui.gui import (add_waveform_view,
+                                     add_trace_view,
+                                     add_feature_view,
+                                     add_correlogram_view,
+                                     )
 
 from model import get_model
+
+
+import os.path as op
+
+from phy.io import Context, Selector
+from phy.cluster.manual.gui_component import ManualClustering
+
+from phycontrib.kwik import create_cluster_store
+
 
 logging.getLogger(__name__).setLevel('DEBUG')
 
@@ -87,32 +100,6 @@ class AmplitudeView(ManualClusteringView):
                          )
 
 
-class AmplitudeViewPlugin(IPlugin):
-    def attach_to_gui(self, gui):
-        cs = gui.request('cluster_store')
-        assert cs
-
-        # state = gui.state
-        model = gui.request('model')
-
-        @cs.add(concat=True)
-        def amplitudes(cluster_id):
-            spike_ids = _spikes_in_clusters(model.spike_clusters, [cluster_id])
-            d = Bunch()
-            d.spike_ids = spike_ids
-            d.spike_times = model.spike_times[spike_ids]
-            d.spike_clusters = cluster_id * np.ones(len(spike_ids),
-                                                    dtype=np.int32)
-            d.amplitudes = model.amplitudes[spike_ids]
-            return d
-
-        view = AmplitudeView(amplitudes=cs.amplitudes,
-                             amplitudes_lim=model.amplitudes_lim,
-                             duration=model.duration,
-                             )
-        view.attach(gui)
-
-
 # -----------------------------------------------------------------------------
 # Template view
 # -----------------------------------------------------------------------------
@@ -135,51 +122,51 @@ class TemplateView(WaveformView):
     }
 
 
-class TemplateViewPlugin(IPlugin):
-    def attach_to_gui(self, gui):
-        state = gui.state
-        model = gui.request('model')
-        bs, ps, ov = state.get_view_params('TemplateView',
-                                           'box_scaling',
-                                           'probe_scaling',
-                                           'overlap',
-                                           )
-        cs = gui.request('cluster_store')
+# class TemplateViewPlugin(IPlugin):
+#     def attach_to_gui(self, gui):
+#         state = gui.state
+#         model = gui.request('model')
+#         bs, ps, ov = state.get_view_params('TemplateView',
+#                                            'box_scaling',
+#                                            'probe_scaling',
+#                                            'overlap',
+#                                            )
+#         cs = gui.request('cluster_store')
 
-        @cs.add(concat=True)
-        def templates(cluster_id):
-            d = Bunch()
-            d.spike_ids = np.array([0])
-            d.spike_clusters = np.array([cluster_id])
-            d.waveforms = model.templates[:, :, [cluster_id]]. \
-                transpose((2, 1, 0))
-            d.masks = model.template_masks[[cluster_id], :]
-            assert (d.spike_ids.shape[0] ==
-                    d.waveforms.shape[0] ==
-                    d.masks.shape[0] == 1)
-            return d
+#         @cs.add(concat=True)
+#         def templates(cluster_id):
+#             d = Bunch()
+#             d.spike_ids = np.array([0])
+#             d.spike_clusters = np.array([cluster_id])
+#             d.waveforms = model.templates[:, :, [cluster_id]]. \
+#                 transpose((2, 1, 0))
+#             d.masks = model.template_masks[[cluster_id], :]
+#             assert (d.spike_ids.shape[0] ==
+#                     d.waveforms.shape[0] ==
+#                     d.masks.shape[0] == 1)
+#             return d
 
-        assert cs  # We need the cluster store to retrieve the data.
-        view = TemplateView(waveforms_masks=cs.templates,
-                            channel_positions=model.channel_positions,
-                            n_samples=model.n_samples_templates,
-                            box_scaling=bs,
-                            probe_scaling=ps,
-                            waveform_lim=model.template_lim,
-                            )
-        view.attach(gui)
+#         assert cs  # We need the cluster store to retrieve the data.
+#         view = TemplateView(waveforms_masks=cs.templates,
+#                             channel_positions=model.channel_positions,
+#                             n_samples=model.n_samples_templates,
+#                             box_scaling=bs,
+#                             probe_scaling=ps,
+#                             waveform_lim=model.template_lim,
+#                             )
+#         view.attach(gui)
 
-        if ov is not None:
-            view.overlap = ov
+#         if ov is not None:
+#             view.overlap = ov
 
-        @gui.connect_
-        def on_close():
-            # Save the box bounds.
-            state.set_view_params(view,
-                                  box_scaling=tuple(view.box_scaling),
-                                  probe_scaling=tuple(view.probe_scaling),
-                                  overlap=view.overlap,
-                                  )
+#         @gui.connect_
+#         def on_close():
+#             # Save the box bounds.
+#             state.set_view_params(view,
+#                                   box_scaling=tuple(view.box_scaling),
+#                                   probe_scaling=tuple(view.probe_scaling),
+#                                   overlap=view.overlap,
+#                                   )
 
 
 # -----------------------------------------------------------------------------
@@ -189,17 +176,9 @@ class TemplateViewPlugin(IPlugin):
 model = get_model()
 create_app()
 
+
 # List of plugins activated by default.
-plugins = ['ContextPlugin',
-           'ClusterStorePlugin',
-           'ManualClusteringPlugin',
-           'WaveformViewPlugin',
-           # 'TemplateViewPlugin',  # not very useful, better to put templates
-                                    # the waveform view  # noaq
-           'AmplitudeViewPlugin',
-           'CorrelogramViewPlugin',
-           'TraceViewPlugin',
-           'SaveGeometryStatePlugin',
+plugins = ['SaveGeometryStatePlugin',
            ]
 
 # Create the GUI.
@@ -213,8 +192,58 @@ gui = create_gui(name='TemplateGUI',
                         },
                  )
 
-cs = gui.request('cluster_store')
-selector = gui.request('selector')
+# Create the manual clustering.
+mc = ManualClustering(model.spike_clusters,
+                      cluster_groups=model.cluster_groups,)
+mc.attach(gui)
+
+# Create the context.
+path = '.'
+context = Context(op.join(op.dirname(path), '.phy'))
+
+
+# Create the store.
+def spikes_per_cluster(cluster_id):
+    # HACK: we get the spikes_per_cluster from the Clustering instance.
+    # We need to access it from a function to avoid circular dependencies
+    # between the cluster store and manual clustering plugins.
+    mc = gui.request('manual_clustering')
+    return mc.clustering.spikes_per_cluster[cluster_id]
+
+
+selector = Selector(spike_clusters=model.spike_clusters,
+                    spikes_per_cluster=spikes_per_cluster,
+                    )
+model.store = create_cluster_store(model,
+                                   selector=selector,
+                                   context=context)
+cs = model.store
+
+
+def add_amplitude_view(gui):
+    @cs.add(concat=True)
+    def amplitudes(cluster_id):
+        spike_ids = _spikes_in_clusters(model.spike_clusters, [cluster_id])
+        d = Bunch()
+        d.spike_ids = spike_ids
+        d.spike_times = model.spike_times[spike_ids]
+        d.spike_clusters = cluster_id * np.ones(len(spike_ids),
+                                                dtype=np.int32)
+        d.amplitudes = model.amplitudes[spike_ids]
+        return d
+
+    view = AmplitudeView(amplitudes=cs.amplitudes,
+                         amplitudes_lim=model.amplitudes_lim,
+                         duration=model.duration,
+                         )
+    view.attach(gui)
+
+
+add_waveform_view(gui)
+add_trace_view(gui)
+# add_feature_view(gui)
+add_correlogram_view(gui)
+add_amplitude_view(gui)
 
 
 def select(cluster_id, n=None):

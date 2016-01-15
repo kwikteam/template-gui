@@ -7,6 +7,7 @@ from phy.traces import SpikeLoader, WaveformLoader
 from phy.traces.filter import apply_filter, bandpass_filter
 from phy.io.array import _spikes_per_cluster
 from phy.utils import Bunch
+from phycontrib.kwik.store import create_cluster_store
 from phycontrib.kwik.model import _concatenate_virtual_arrays
 from phycontrib.csicsvari.traces import read_dat
 
