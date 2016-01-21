@@ -12,23 +12,26 @@ from phycontrib.csicsvari.traces import read_dat
 
 
 filenames = {
-    'traces': '20150603_1.dat',
-    'amplitudes': 'amplitudes.mat',
-    'spike_clusters': 'clusterIDs.mat',
-    'templates': 'templates.mat',
-    'spike_samples': 'spikeTimes.mat',
-    'channel_mapping': 'chanMap0ind.mat',
-    'channel_positions_x': 'xcoords.mat',
-    'channel_positions_y': 'ycoords.mat',
+    'traces': '20151102_1.dat',
+    'amplitudes': 'amplitudes.npy',
+    'spike_clusters': 'clusterIDs.npy',
+    'templates': 'templates.npy',
+    'spike_samples': 'spikeTimes.npy',
+    'channel_mapping': 'chanMap0ind.npy',
+    'channel_positions_x': 'xcoords.npy',
+    'channel_positions_y': 'ycoords.npy',
     # '': 'Fs.mat',
     # '': 'connected.mat',
 }
 
 
-def read_mat(name):
+def read_array(name):
     fn = filenames[name]
-    arr_name = op.splitext(fn)[0]
-    return sio.loadmat(fn)[arr_name]
+    arr_name, ext = op.splitext(fn)
+    if ext == '.mat':
+        return sio.loadmat(fn)[arr_name]
+    elif ext == '.npy':
+        return np.load(fn)
 
 
 def get_masks(templates):
@@ -68,25 +71,25 @@ def get_model():
     n_samples_t, _ = traces.shape
     assert _ == n_channels_dat
 
-    amplitudes = read_mat('amplitudes').squeeze()
+    amplitudes = read_array('amplitudes').squeeze()
     n_spikes, = amplitudes.shape
 
-    spike_clusters = read_mat('spike_clusters').squeeze()
+    spike_clusters = read_array('spike_clusters').squeeze()
     spike_clusters -= 1  # 1 -> n_templates
     assert spike_clusters.shape == (n_spikes,)
 
-    spike_samples = read_mat('spike_samples').squeeze()
+    spike_samples = read_array('spike_samples').squeeze()
     assert spike_samples.shape == (n_spikes,)
 
-    templates = read_mat('templates')
+    templates = read_array('templates')
     templates[np.isnan(templates)] = 0
     n_channels, n_samples_templates, n_templates = templates.shape
 
-    channel_mapping = read_mat('channel_mapping').squeeze()
+    channel_mapping = read_array('channel_mapping').squeeze()
     assert channel_mapping.shape == (n_channels,)
 
-    channel_positions = np.c_[read_mat('channel_positions_x'),
-                              read_mat('channel_positions_y')]
+    channel_positions = np.c_[read_array('channel_positions_x'),
+                              read_array('channel_positions_y')]
     assert channel_positions.shape == (n_channels, 2)
 
     model = Bunch()
