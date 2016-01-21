@@ -7,7 +7,6 @@ from phy.traces import SpikeLoader, WaveformLoader
 from phy.traces.filter import apply_filter, bandpass_filter
 from phy.io.array import _spikes_per_cluster
 from phy.utils import Bunch
-from phycontrib.kwik.store import create_cluster_store
 from phycontrib.kwik.model import _concatenate_virtual_arrays
 from phycontrib.csicsvari.traces import read_dat
 
@@ -97,8 +96,8 @@ def get_model():
     model.n_spikes = n_spikes
 
     # Amplitudes
-    model.amplitudes = amplitudes
-    model.amplitudes_lim = np.percentile(model.amplitudes, 95)
+    model.all_amplitudes = amplitudes
+    model.amplitudes_lim = np.percentile(model.all_amplitudes, 95)
 
     # Templates
     model.templates = templates
@@ -112,7 +111,7 @@ def get_model():
     model.cluster_ids = np.unique(model.spike_clusters)
     n_clusters = len(model.cluster_ids)
     model.channel_positions = channel_positions
-    model.traces = traces
+    model.all_traces = traces
 
     # Filter the waveforms.
     order = 3
@@ -132,12 +131,12 @@ def get_model():
                                filter_margin=filter_margin,
                                )
     waveforms = SpikeLoader(waveforms, spike_samples)
-    model.waveforms = waveforms
+    model.all_waveforms = waveforms
 
     model.template_masks = get_masks(templates)
-    model.masks = MaskLoader(model.template_masks, spike_clusters)
-    model.features = None
-    model.features_masks = None
+    model.all_masks = MaskLoader(model.template_masks, spike_clusters)
+    # model.features = None
+    # model.features_masks = None
 
     model.spikes_per_cluster = _spikes_per_cluster(model.spike_clusters)
     model.n_features_per_channel = 1

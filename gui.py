@@ -12,7 +12,7 @@ import logging
 import numpy as np
 
 from phy.utils import Bunch
-from phy.io.array import _spikes_in_clusters
+from phy.io.array import _spikes_in_clusters, _concat
 from phy.cluster.manual.views import (ScatterView,)
 from phy.gui import create_app, create_gui, run_app
 from phycontrib.kwik_gui.gui import (add_waveform_view,
@@ -79,14 +79,13 @@ def spikes_per_cluster(cluster_id):
 selector = Selector(spike_clusters=model.spike_clusters,
                     spikes_per_cluster=spikes_per_cluster,
                     )
-model.store = create_cluster_store(model,
-                                   selector=selector,
-                                   context=context)
-cs = model.store
+create_cluster_store(model, selector=selector, context=context)
 
 
 def add_amplitude_view(gui):
-    @cs.add(concat=True)
+
+    @_concat
+    @context.cache
     def amplitudes(cluster_id):
         spike_ids = _spikes_in_clusters(model.spike_clusters, [cluster_id])
         d = Bunch()
@@ -94,10 +93,11 @@ def add_amplitude_view(gui):
         d.x = model.spike_times[spike_ids]
         d.spike_clusters = cluster_id * np.ones(len(spike_ids),
                                                 dtype=np.int32)
-        d.y = model.amplitudes[spike_ids]
+        d.y = model.all_amplitudes[spike_ids]
         return d
+    model.amplitudes = amplitudes
 
-    view = ScatterView(coords=cs.amplitudes,
+    view = ScatterView(coords=model.amplitudes,
                        data_bounds=[0, 0, model.duration,
                                     model.amplitudes_lim],
                        )
@@ -122,8 +122,9 @@ def _get_data(**kwargs):
     return Bunch(**kwargs)
 
 
-@cs.add(concat=True)
-def waveforms_masks(cluster_id):
+@_concat
+@context.cache
+def waveforms(cluster_id):
     spike_ids = select(cluster_id, 100)
     waveforms = np.atleast_2d(model.waveforms[spike_ids])
     assert waveforms.ndim == 3
@@ -142,6 +143,7 @@ def waveforms_masks(cluster_id):
                      mean_waveforms=mw,
                      mean_masks=mm,
                      )
+model.waveforms = waveforms
 
 
 # Save.
