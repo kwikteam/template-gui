@@ -5,7 +5,7 @@ import scipy.io as sio
 
 from phy.traces import SpikeLoader, WaveformLoader
 from phy.traces.filter import apply_filter, bandpass_filter
-from phy.io.array import _spikes_per_cluster
+from phy.io.array import _spikes_per_cluster, _spikes_in_clusters
 from phy.utils import Bunch
 from phycontrib.kwik.model import _concatenate_virtual_arrays
 from phycontrib.csicsvari.traces import read_dat
@@ -37,10 +37,10 @@ def read_array(name):
 def get_masks(templates):
     n_channels, n_samples_templates, n_templates = templates.shape
     templates = np.abs(templates)
-    masks = np.zeros((n_templates, n_channels))
-    m = templates.max(axis=1)
-    m = m > .05 * m.max(axis=0)
-    masks[m.T] = 1
+    m = templates.max(axis=1).T  # n_templates, n_channels
+    mm = m.max(axis=1)
+    masks = m / mm[:, np.newaxis]
+    masks[mm == 0, :] = 0
     return masks
 
 
@@ -60,8 +60,8 @@ def get_model():
 
     # TODO: params
     n_channels_dat = 129
-    sample_rate = 20000.
-    n_samples_waveforms = (0, 40)
+    sample_rate = 25000.
+    n_samples_waveforms = 30
 
     traces = read_dat(filenames['traces'],
                       n_channels=n_channels_dat,
@@ -85,7 +85,7 @@ def get_model():
     templates[np.isnan(templates)] = 0
     n_channels, n_samples_templates, n_templates = templates.shape
 
-    channel_mapping = read_array('channel_mapping').squeeze()
+    channel_mapping = read_array('channel_mapping').squeeze().astype(np.int32)
     assert channel_mapping.shape == (n_channels,)
 
     channel_positions = np.c_[read_array('channel_positions_x'),

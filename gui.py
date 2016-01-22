@@ -59,7 +59,8 @@ gui = create_gui(name='TemplateGUI',
 
 # Create the manual clustering.
 mc = ManualClustering(model.spike_clusters,
-                      cluster_groups=model.cluster_groups,)
+                      cluster_groups=model.cluster_groups,
+                      )
 mc.attach(gui)
 
 # Create the context.
