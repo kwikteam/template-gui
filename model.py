@@ -35,11 +35,11 @@ def read_array(name):
 
 
 def get_masks(templates):
-    n_channels, n_samples_templates, n_templates = templates.shape
+    n_templates, n_samples_templates, n_channels = templates.shape
     templates = np.abs(templates)
-    m = templates.max(axis=1).T  # n_templates, n_channels
-    mm = m.max(axis=1)
-    masks = m / mm[:, np.newaxis]
+    m = templates.max(axis=1)  # (n_templates, n_channels)
+    mm = m.max(axis=1)  # (n_templates,
+    masks = m / mm[:, np.newaxis]  # (n_templates, n_channels)
     masks[mm == 0, :] = 0
     return masks
 
@@ -83,7 +83,8 @@ def get_model():
 
     templates = read_array('templates')
     templates[np.isnan(templates)] = 0
-    n_channels, n_samples_templates, n_templates = templates.shape
+    templates = np.transpose(templates, (2, 1, 0))
+    n_templates, n_samples_templates, n_channels = templates.shape
 
     channel_mapping = read_array('channel_mapping').squeeze().astype(np.int32)
     assert channel_mapping.shape == (n_channels,)
