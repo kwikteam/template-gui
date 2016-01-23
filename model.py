@@ -20,6 +20,7 @@ filenames = {
     'channel_mapping': 'chanMap0ind.npy',
     'channel_positions_x': 'xcoords.npy',
     'channel_positions_y': 'ycoords.npy',
+    'whitening_matrix': 'whiteningMatrix.npy',
     # '': 'Fs.mat',
     # '': 'connected.mat',
 }
@@ -116,6 +117,8 @@ def get_model():
     n_clusters = len(model.cluster_ids)
     model.channel_positions = channel_positions
     model.all_traces = traces
+
+    model.whitening_matrix = read_array('whitening_matrix')
 
     # Filter the waveforms.
     order = 3
