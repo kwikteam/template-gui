@@ -140,7 +140,7 @@ def traces(interval):
         n = tr.shape[0]
         for index in range(w.shape[0]):
             t = int(round((st[index] - interval[0]) * model.sample_rate))
-            i, j = 30, 31
+            i, j = 20, 41
             x = w[index]  # (n_samples, n_channels)
             sa, sb = t - i, t + j
             if sa < 0:
