@@ -12,7 +12,7 @@ import logging
 import numpy as np
 
 from phy.utils import Bunch
-from phy.io.array import _spikes_in_clusters, _concat
+from phy.io.array import _spikes_in_clusters, concat_per_cluster
 from phy.cluster.manual.views import (ScatterView,)
 from phy.gui import create_app, create_gui, run_app
 from phycontrib.kwik_gui.gui import (add_waveform_view,
@@ -28,7 +28,7 @@ import os.path as op
 from phy.io import Context, Selector
 from phy.cluster.manual.gui_component import ManualClustering
 
-from phycontrib.kwik import create_cluster_store
+from phycontrib.kwik.store import create_cluster_store
 
 
 logging.getLogger(__name__).setLevel('DEBUG')
@@ -39,6 +39,23 @@ logging.getLogger(__name__).setLevel('DEBUG')
 # -----------------------------------------------------------------------------
 
 model = get_model()
+
+
+# Create the context.
+path = '.'
+context = Context(op.join(op.dirname(path), '.phy'))
+
+
+# Define and cache the cluster -> spikes function.
+@context.cache(memcache=True)
+def spikes_per_cluster(cluster_id):
+    return np.nonzero(model.spike_clusters == cluster_id)[0]
+model.spikes_per_cluster = spikes_per_cluster
+
+selector = Selector(model.spikes_per_cluster)
+create_cluster_store(model, selector=selector, context=context)
+
+
 create_app()
 
 
@@ -48,7 +65,6 @@ plugins = ['SaveGeometryStatePlugin',
 
 # Create the GUI.
 gui = create_gui(name='TemplateGUI',
-                 model=model,
                  plugins=plugins,
                  state={'ClusterView': {
                         'quality': 'n_spikes',
@@ -56,36 +72,19 @@ gui = create_gui(name='TemplateGUI',
                         }
                         },
                  )
+gui.model = model
 
 # Create the manual clustering.
 mc = ManualClustering(model.spike_clusters,
+                      model.spikes_per_cluster,
                       cluster_groups=model.cluster_groups,
                       )
 mc.attach(gui)
 
-# Create the context.
-path = '.'
-context = Context(op.join(op.dirname(path), '.phy'))
-
-
-# Create the store.
-def spikes_per_cluster(cluster_id):
-    # HACK: we get the spikes_per_cluster from the Clustering instance.
-    # We need to access it from a function to avoid circular dependencies
-    # between the cluster store and manual clustering plugins.
-    mc = gui.request('manual_clustering')
-    return mc.clustering.spikes_per_cluster[cluster_id]
-
-
-selector = Selector(spike_clusters=model.spike_clusters,
-                    spikes_per_cluster=spikes_per_cluster,
-                    )
-create_cluster_store(model, selector=selector, context=context)
-
 
 def add_amplitude_view(gui):
 
-    @_concat
+    @concat_per_cluster
     @context.cache
     def amplitudes(cluster_id):
         spike_ids = _spikes_in_clusters(model.spike_clusters, [cluster_id])
@@ -123,7 +122,7 @@ def _get_data(**kwargs):
     return Bunch(**kwargs)
 
 
-@_concat
+@concat_per_cluster
 @context.cache
 def waveforms(cluster_id):
     spike_ids = select(cluster_id, 100)

@@ -145,7 +145,6 @@ def get_model():
     # model.features = None
     # model.features_masks = None
 
-    model.spikes_per_cluster = _spikes_per_cluster(model.spike_clusters)
     model.n_features_per_channel = 1
     model.n_samples_waveforms = n_samples_waveforms
     model.cluster_groups = {c: None for c in range(n_clusters)}
