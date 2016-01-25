@@ -116,30 +116,6 @@ def _get_data(**kwargs):
     return Bunch(**kwargs)
 
 
-@concat_per_cluster
-@context.cache
-def waveforms(cluster_id):
-    spike_ids = select(cluster_id, 100)
-    waveforms = np.atleast_2d(model.waveforms[spike_ids])
-    assert waveforms.ndim == 3
-    masks = np.atleast_2d(model.masks[spike_ids])
-    assert masks.ndim == 2
-    # Ensure that both arrays have the same number of channels.
-    assert masks.shape[1] == waveforms.shape[2]
-
-    # Templates
-    mw = model.templates[:, :, [cluster_id]].transpose((2, 1, 0))
-    mm = model.template_masks[[cluster_id], :]
-
-    return _get_data(spike_ids=spike_ids,
-                     waveforms=waveforms,
-                     masks=masks,
-                     mean_waveforms=mw,
-                     mean_masks=mm,
-                     )
-model.waveforms = waveforms
-
-
 do_show_residuals = False
 
 
@@ -202,6 +178,7 @@ tv = add_trace_view(gui)
 def toggle_trace_residuals():
     global do_show_residuals
     do_show_residuals = not do_show_residuals
+    print("show residuals:", do_show_residuals)
     tv.on_select()
 
 
