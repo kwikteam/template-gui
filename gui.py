@@ -13,7 +13,9 @@ import numpy as np
 
 from phy.utils import Bunch
 from phy.io.array import _spikes_in_clusters, concat_per_cluster
-from phy.cluster.manual.views import (ScatterView,)
+from phy.cluster.manual.views import (ScatterView,
+                                      select_traces,
+                                      )
 from phy.gui import create_app, create_gui, run_app
 from phycontrib.kwik_gui.gui import (add_waveform_view,
                                      add_trace_view,
@@ -39,7 +41,6 @@ logging.getLogger(__name__).setLevel('DEBUG')
 # -----------------------------------------------------------------------------
 
 model = get_model()
-
 
 # Create the context.
 path = '.'
@@ -104,13 +105,6 @@ def add_amplitude_view(gui):
     view.attach(gui)
 
 
-add_waveform_view(gui)
-add_trace_view(gui)
-# add_feature_view(gui)
-add_correlogram_view(gui)
-add_amplitude_view(gui)
-
-
 def select(cluster_id, n=None):
     assert isinstance(cluster_id, int)
     assert cluster_id >= 0
@@ -146,11 +140,69 @@ def waveforms(cluster_id):
 model.waveforms = waveforms
 
 
+do_show_residuals = False
+
+
+def traces(interval):
+    """Load traces and spikes in an interval."""
+    global do_show_residuals
+    tr = select_traces(model.all_traces, interval,
+                       sample_rate=model.sample_rate,
+                       ).astype(np.float32).copy()
+    # Find spikes.
+    a, b = model.spike_times.searchsorted(interval)
+    st = model.spike_times[a:b]
+    sc = model.spike_clusters[a:b]
+
+    # Remove templates.
+    if do_show_residuals:
+        wm = model.whitening_matrix / 200.
+        temp = model.templates[sc]
+        temp = np.dot(temp, np.linalg.inv(wm))
+        amp = model.all_amplitudes[a:b]
+        w = temp * amp[:, np.newaxis, np.newaxis]
+        n = tr.shape[0]
+        for index in range(w.shape[0]):
+            t = int(round((st[index] - interval[0]) * model.sample_rate))
+            i, j = 30, 31
+            x = w[index]  # (n_samples, n_channels)
+            sa, sb = t - i, t + j
+            if sa < 0:
+                x = x[-sa:, :]
+                sa = 0
+            elif sb > n:
+                x = x[:-(sb - n), :]
+                sb = n
+            tr[sa:sb, :] -= x
+
+    m = model.all_masks[a:b]
+    return Bunch(traces=tr,
+                 spike_times=st,
+                 spike_clusters=sc,
+                 masks=m,
+                 )
+model.traces = traces
+
+
 # Save.
 @gui.connect_
 def on_request_save(spike_clusters, groups):
     groups = {c: g.title() for c, g in groups.items()}
     # TODO: save the spike clusters and groups on disk.
+
+# Views
+add_waveform_view(gui)
+# add_feature_view(gui)
+add_correlogram_view(gui)
+add_amplitude_view(gui)
+tv = add_trace_view(gui)
+
+
+@tv.actions.add(shortcut='alt+r')
+def toggle_trace_residuals():
+    global do_show_residuals
+    do_show_residuals = not do_show_residuals
+    tv.on_select()
 
 
 # Show the GUI.
