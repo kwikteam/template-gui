@@ -28,12 +28,8 @@ logging.getLogger(__name__).setLevel('DEBUG')
 # -----------------------------------------------------------------------------
 
 model = get_model()
-
-
 create_app()
 
-
-# List of plugins activated by default.
 plugins = ['SaveGeometryStatePlugin',
            ]
 

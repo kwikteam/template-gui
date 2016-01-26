@@ -233,8 +233,6 @@ def get_model():
         return [tr, tr_sub]
     model.traces = traces
 
-
-
     return model
 
 
