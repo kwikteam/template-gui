@@ -3,11 +3,15 @@ import os.path as op
 import numpy as np
 import scipy.io as sio
 
+from phy.cluster.manual.views import select_traces
+from phy.io import Context, Selector
+from phy.io.array import _spikes_in_clusters, concat_per_cluster
+from phy.utils import Bunch
 from phy.traces import SpikeLoader, WaveformLoader
 from phy.traces.filter import apply_filter, bandpass_filter
-from phy.io.array import _spikes_per_cluster, _spikes_in_clusters
-from phy.utils import Bunch
+
 from phycontrib.kwik.model import _concatenate_virtual_arrays
+from phycontrib.kwik.store import create_cluster_store
 from phycontrib.csicsvari.traces import read_dat
 
 
@@ -179,6 +183,57 @@ def get_model():
     model.n_features_per_channel = 1
     model.n_samples_waveforms = n_samples_waveforms
     model.cluster_groups = {c: None for c in range(n_clusters)}
+
+    # Create the context.
+    path = '.'
+    context = Context(op.join(op.dirname(path), '.phy'))
+
+    # Define and cache the cluster -> spikes function.
+    @context.cache(memcache=True)
+    def spikes_per_cluster(cluster_id):
+        return np.nonzero(model.spike_clusters == cluster_id)[0]
+    model.spikes_per_cluster = spikes_per_cluster
+
+    selector = Selector(model.spikes_per_cluster)
+    create_cluster_store(model, selector=selector, context=context)
+
+    @concat_per_cluster
+    @context.cache
+    def amplitudes(cluster_id):
+        spike_ids = _spikes_in_clusters(model.spike_clusters, [cluster_id])
+        d = Bunch()
+        d.spike_ids = spike_ids
+        d.x = model.spike_times[spike_ids]
+        d.spike_clusters = cluster_id * np.ones(len(spike_ids),
+                                                dtype=np.int32)
+        d.y = model.all_amplitudes[spike_ids]
+        return d
+    model.amplitudes = amplitudes
+
+    def traces(interval):
+        """Load traces and spikes in an interval."""
+        tr = select_traces(model.all_traces, interval,
+                           sample_rate=model.sample_rate,
+                           )
+        tr = tr - np.mean(tr, axis=0)
+
+        a, b = model.spike_times.searchsorted(interval)
+        sc = model.spike_clusters[a:b]
+
+        # Remove templates.
+        tr_sub = subtract_templates(tr,
+                                    start=interval[0],
+                                    spike_times=model.spike_times[a:b],
+                                    amplitudes=model.all_amplitudes[a:b],
+                                    spike_templates=model.templates[sc],
+                                    whitening_matrix=model.whitening_matrix,
+                                    sample_rate=model.sample_rate,
+                                    scaling_factor=1. / 200)
+
+        return [tr, tr_sub]
+    model.traces = traces
+
+
 
     return model
 
