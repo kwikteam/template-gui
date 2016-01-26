@@ -137,26 +137,6 @@ def traces(interval):
 model.traces = traces
 
 
-def spikes_traces(interval):
-    traces1, traces2 = model.traces(interval)
-    out1 = extract_spikes(traces1, interval,
-                          sample_rate=model.sample_rate,
-                          spike_times=model.spike_times,
-                          spike_clusters=model.spike_clusters,
-                          all_masks=model.all_masks,
-                          n_samples_waveforms=model.n_samples_waveforms,
-                          )
-    # out2 = extract_spikes(traces2, interval,
-    #                       sample_rate=model.sample_rate,
-    #                       spike_times=model.spike_times,
-    #                       spike_clusters=model.spike_clusters,
-    #                       all_masks=model.all_masks,
-    #                       n_samples_waveforms=model.n_samples_waveforms,
-    #                       )
-    return out1
-model.spikes_traces = spikes_traces
-
-
 # Save.
 @gui.connect_
 def on_request_save(spike_clusters, groups):
@@ -169,14 +149,6 @@ add_waveform_view(gui)
 add_correlogram_view(gui)
 add_amplitude_view(gui)
 tv = add_trace_view(gui)
-
-
-# @tv.actions.add(shortcut='alt+r')
-# def toggle_trace_residuals():
-#     global do_show_residuals
-#     do_show_residuals = not do_show_residuals
-#     print("show residuals:", do_show_residuals)
-#     tv.on_select()
 
 
 # Show the GUI.
