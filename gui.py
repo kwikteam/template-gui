@@ -8,30 +8,27 @@
 # -----------------------------------------------------------------------------
 
 import logging
+import os.path as op
 
 import numpy as np
 
-from phy.utils import Bunch
-from phy.io.array import _spikes_in_clusters, concat_per_cluster
+from phy.cluster.manual.gui_component import ManualClustering
 from phy.cluster.manual.views import (ScatterView,
                                       select_traces,
+                                      extract_spikes,
                                       )
 from phy.gui import create_app, create_gui, run_app
+from phy.io import Context, Selector
+from phy.io.array import _spikes_in_clusters, concat_per_cluster
+from phy.utils import Bunch
+
+from phycontrib.kwik.store import create_cluster_store
 from phycontrib.kwik_gui.gui import (add_waveform_view,
                                      add_trace_view,
                                      add_correlogram_view,
                                      )
 
-from model import get_model
-
-
-import os.path as op
-
-from phy.io import Context, Selector
-from phy.cluster.manual.gui_component import ManualClustering
-
-from phycontrib.kwik.store import create_cluster_store
-
+from model import get_model, subtract_templates
 
 logging.getLogger(__name__).setLevel('DEBUG')
 
@@ -116,48 +113,48 @@ def _get_data(**kwargs):
     return Bunch(**kwargs)
 
 
-do_show_residuals = False
-
-
 def traces(interval):
     """Load traces and spikes in an interval."""
-    global do_show_residuals
     tr = select_traces(model.all_traces, interval,
                        sample_rate=model.sample_rate,
-                       ).astype(np.float32).copy()
-    # Find spikes.
+                       )
+    tr = tr - np.mean(tr, axis=0)
+
     a, b = model.spike_times.searchsorted(interval)
-    st = model.spike_times[a:b]
     sc = model.spike_clusters[a:b]
 
     # Remove templates.
-    if do_show_residuals:
-        wm = model.whitening_matrix / 200.
-        temp = model.templates[sc]
-        temp = np.dot(temp, np.linalg.inv(wm))
-        amp = model.all_amplitudes[a:b]
-        w = temp * amp[:, np.newaxis, np.newaxis]
-        n = tr.shape[0]
-        for index in range(w.shape[0]):
-            t = int(round((st[index] - interval[0]) * model.sample_rate))
-            i, j = 20, 41
-            x = w[index]  # (n_samples, n_channels)
-            sa, sb = t - i, t + j
-            if sa < 0:
-                x = x[-sa:, :]
-                sa = 0
-            elif sb > n:
-                x = x[:-(sb - n), :]
-                sb = n
-            tr[sa:sb, :] -= x
+    tr_sub = subtract_templates(tr,
+                                start=interval[0],
+                                spike_times=model.spike_times[a:b],
+                                amplitudes=model.all_amplitudes[a:b],
+                                spike_templates=model.templates[sc],
+                                whitening_matrix=model.whitening_matrix,
+                                sample_rate=model.sample_rate,
+                                scaling_factor=1. / 200)
 
-    m = model.all_masks[a:b]
-    return Bunch(traces=tr,
-                 spike_times=st,
-                 spike_clusters=sc,
-                 masks=m,
-                 )
+    return [tr, tr_sub]
 model.traces = traces
+
+
+def spikes_traces(interval):
+    traces1, traces2 = model.traces(interval)
+    out1 = extract_spikes(traces1, interval,
+                          sample_rate=model.sample_rate,
+                          spike_times=model.spike_times,
+                          spike_clusters=model.spike_clusters,
+                          all_masks=model.all_masks,
+                          n_samples_waveforms=model.n_samples_waveforms,
+                          )
+    # out2 = extract_spikes(traces2, interval,
+    #                       sample_rate=model.sample_rate,
+    #                       spike_times=model.spike_times,
+    #                       spike_clusters=model.spike_clusters,
+    #                       all_masks=model.all_masks,
+    #                       n_samples_waveforms=model.n_samples_waveforms,
+    #                       )
+    return out1
+model.spikes_traces = spikes_traces
 
 
 # Save.
@@ -174,12 +171,12 @@ add_amplitude_view(gui)
 tv = add_trace_view(gui)
 
 
-@tv.actions.add(shortcut='alt+r')
-def toggle_trace_residuals():
-    global do_show_residuals
-    do_show_residuals = not do_show_residuals
-    print("show residuals:", do_show_residuals)
-    tv.on_select()
+# @tv.actions.add(shortcut='alt+r')
+# def toggle_trace_residuals():
+#     global do_show_residuals
+#     do_show_residuals = not do_show_residuals
+#     print("show residuals:", do_show_residuals)
+#     tv.on_select()
 
 
 # Show the GUI.

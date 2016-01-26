@@ -57,6 +57,37 @@ class MaskLoader(object):
         return self._cluster_masks[clu]
 
 
+def subtract_templates(traces,
+                       start=None,
+                       spike_times=None,
+                       amplitudes=None,
+                       spike_templates=None,
+                       whitening_matrix=None,
+                       sample_rate=None,
+                       scaling_factor=1.):
+    traces = traces.copy()
+    st = spike_times
+    wm = whitening_matrix * scaling_factor
+    temp = spike_templates
+    temp = np.dot(temp, np.linalg.inv(wm))
+    amp = amplitudes
+    w = temp * amp[:, np.newaxis, np.newaxis]
+    n = traces.shape[0]
+    for index in range(w.shape[0]):
+        t = int(round((st[index] - start) * sample_rate))
+        i, j = 20, 41
+        x = w[index]  # (n_samples, n_channels)
+        sa, sb = t - i, t + j
+        if sa < 0:
+            x = x[-sa:, :]
+            sa = 0
+        elif sb > n:
+            x = x[:-(sb - n), :]
+            sb = n
+        traces[sa:sb, :] -= x
+    return traces
+
+
 def get_model():
 
     # TODO: params
