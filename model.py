@@ -231,7 +231,7 @@ def get_model():
                                     scaling_factor=1. / 200)
 
         return [Bunch(traces=tr),
-                Bunch(traces=tr_sub, color=(.3, .3, .3, .5))]
+                Bunch(traces=tr_sub, color=(.25, .25, .25, .75))]
     model.traces = traces
 
     return model
