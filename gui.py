@@ -46,6 +46,7 @@ mc = ManualClustering(model.spike_clusters,
                       similarity=model.probe_distance,
                       cluster_groups=model.cluster_groups,
                       )
+mc.add_column(model.probe_depth)
 mc.attach(gui)
 
 
