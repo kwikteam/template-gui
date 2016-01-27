@@ -230,7 +230,8 @@ def get_model():
                                     sample_rate=model.sample_rate,
                                     scaling_factor=1. / 200)
 
-        return [tr, tr_sub]
+        return [Bunch(traces=tr),
+                Bunch(traces=tr_sub, color=(.3, .3, .3, .5))]
     model.traces = traces
 
     return model
