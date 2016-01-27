@@ -189,7 +189,7 @@ def get_model():
     context = Context(op.join(op.dirname(path), '.phy'))
 
     # Define and cache the cluster -> spikes function.
-    @context.cache(memcache=True)
+    @context.memcache
     def spikes_per_cluster(cluster_id):
         return np.nonzero(model.spike_clusters == cluster_id)[0]
     model.spikes_per_cluster = spikes_per_cluster
