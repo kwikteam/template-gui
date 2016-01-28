@@ -225,6 +225,10 @@ def get_model():
                                   )
     assert features_ind.shape == (n_loc_chan, model.n_templates)
 
+    n_sim_tem = template_features.shape[1]
+    assert template_features.shape == (n_spikes, n_sim_tem)
+    assert template_features_ind.shape == (n_sim_tem, n_templates)
+
     @concat_per_cluster
     @context.cache
     def features(cluster_id):
@@ -235,7 +239,7 @@ def get_model():
         shape = (ns, nc, nfpc)
         f = np.zeros(shape)
         # Sparse channels.
-        ch = features_ind[:, cluster_id]
+        ch = features_ind[:, cluster_id] - 1
         # Populate the dense features array.
         f[:, ch, :] = np.transpose(all_features[spike_ids, :, :], (0, 2, 1))
         m = model.masks(cluster_id).masks
@@ -266,6 +270,43 @@ def get_model():
         d.y = model.all_amplitudes[spike_ids]
         return d
     model.amplitudes = amplitudes
+
+    def get_template_features(cluster_ids):
+        d = Bunch()
+        if len(cluster_ids) < 2:
+            return None
+        cx, cy = map(int, cluster_ids[:2])
+        # assert template_features.shape == (n_spikes, n_sim_tem)
+        # assert template_features_ind.shape == (n_sim_tem, n_templates)
+        ind_x = template_features_ind == cx + 1
+        ind_y = template_features_ind == cy + 1
+        ind = ind_x | ind_y
+        temps = np.nonzero(np.sum(ind, axis=0) > 0)[0]
+        spike_ids = _spikes_in_clusters(model.spike_clusters, temps)
+        spike_ids = spike_ids[:10000]
+        n_spikes = len(spike_ids)
+        sc = model.spike_clusters[spike_ids]
+        shape = (n_spikes, n_templates)
+        f = np.zeros(shape)
+        i = template_features_ind[:, sc].T - 1  # (n_spikes, n_sim_tem)
+        n_sim_tem = i.shape[1]
+        j = np.ravel_multi_index((np.repeat(np.arange(n_spikes), n_sim_tem),
+                                  i.flatten(),
+                                  ),
+                                 shape)
+        f.flat[j] = template_features[spike_ids, :].ravel()
+        d.x = f[:, cx]
+        d.y = f[:, cy]
+        d.spike_ids = spike_ids
+        # NOTE: the spike clusters do not belong to the selected clusters
+        # so we don't show the cluster colors in this view.
+        d.spike_clusters = None
+
+        return d
+    model.template_features = get_template_features
+    tf = template_features[:1000, :]
+    m, M = tf.min(), tf.max()
+    model.template_features_bounds = [m, m, M, M]
 
     def traces(interval):
         """Load traces and spikes in an interval."""

@@ -51,11 +51,27 @@ mc.add_column(model.probe_depth)
 mc.attach(gui)
 
 
+class AmplitudeView(ScatterView):
+    pass
+
+
 def add_amplitude_view(gui):
-    view = ScatterView(coords=model.amplitudes,
-                       data_bounds=[0, 0, model.duration,
-                                    model.amplitudes_lim],
-                       )
+    view = AmplitudeView(coords=model.amplitudes,
+                         data_bounds=[0, 0, model.duration,
+                                      model.amplitudes_lim],
+                         )
+    view.attach(gui)
+
+
+class FeatureTemplateView(ScatterView):
+    pass
+
+
+def add_feature_template_view(gui):
+    view = FeatureTemplateView(coords=model.template_features,
+                               data_bounds=model.template_features_bounds,
+                               )
+    view
     view.attach(gui)
 
 
@@ -68,6 +84,7 @@ def on_request_save(spike_clusters, groups):
 # Views
 add_waveform_view(gui)
 add_feature_view(gui)
+add_feature_template_view(gui)
 add_correlogram_view(gui)
 add_amplitude_view(gui)
 tv = add_trace_view(gui)
