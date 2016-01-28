@@ -139,6 +139,7 @@ def get_model():
                                 mmap_mode='r')
     template_features_ind = np.load(filenames['template_features_ind'],
                                     mmap_mode='r')
+    template_features_ind = template_features_ind.T.copy()
 
     model = Bunch()
     model.n_channels = n_channels
@@ -227,7 +228,7 @@ def get_model():
 
     n_sim_tem = template_features.shape[1]
     assert template_features.shape == (n_spikes, n_sim_tem)
-    assert template_features_ind.shape == (n_sim_tem, n_templates)
+    assert template_features_ind.shape == (n_templates, n_sim_tem)
 
     @concat_per_cluster
     @context.cache
@@ -271,37 +272,29 @@ def get_model():
         return d
     model.amplitudes = amplitudes
 
+    @context.cache
     def get_template_features(cluster_ids):
         d = Bunch()
         if len(cluster_ids) < 2:
             return None
+        assert template_features.shape == (n_spikes, n_sim_tem)
+        assert template_features_ind.shape == (n_templates, n_sim_tem)
         cx, cy = map(int, cluster_ids[:2])
-        # assert template_features.shape == (n_spikes, n_sim_tem)
-        # assert template_features_ind.shape == (n_sim_tem, n_templates)
-        ind_x = template_features_ind == cx + 1
-        ind_y = template_features_ind == cy + 1
-        ind = ind_x | ind_y
-        temps = np.nonzero(np.sum(ind, axis=0) > 0)[0]
-        spike_ids = _spikes_in_clusters(model.spike_clusters, temps)
-        spike_ids = spike_ids[:10000]
-        n_spikes = len(spike_ids)
-        sc = model.spike_clusters[spike_ids]
-        shape = (n_spikes, n_templates)
-        f = np.zeros(shape)
-        i = template_features_ind[:, sc].T - 1  # (n_spikes, n_sim_tem)
-        n_sim_tem = i.shape[1]
-        j = np.ravel_multi_index((np.repeat(np.arange(n_spikes), n_sim_tem),
-                                  i.flatten(),
-                                  ),
-                                 shape)
-        f.flat[j] = template_features[spike_ids, :].ravel()
-        d.x = f[:, cx]
-        d.y = f[:, cy]
+        sim_x = template_features_ind[cx - 1].tolist()
+        sim_y = template_features_ind[cy - 1].tolist()
+        if cx not in sim_y or cy not in sim_x:
+            return None
+        sxy = sim_x.index(cy)
+        syx = sim_y.index(cx)
+        spikes_x = _spikes_in_clusters(model.spike_clusters, [cx])
+        spikes_y = _spikes_in_clusters(model.spike_clusters, [cy])
+        spike_ids = np.hstack([spikes_x, spikes_y])
+        d.x = np.hstack([template_features[spikes_x, 0],
+                         template_features[spikes_y, syx]])
+        d.y = np.hstack([template_features[spikes_x, sxy],
+                         template_features[spikes_y, 0]])
         d.spike_ids = spike_ids
-        # NOTE: the spike clusters do not belong to the selected clusters
-        # so we don't show the cluster colors in this view.
-        d.spike_clusters = None
-
+        d.spike_clusters = model.spike_clusters[spike_ids]
         return d
     model.template_features = get_template_features
     tf = template_features[:1000, :]
