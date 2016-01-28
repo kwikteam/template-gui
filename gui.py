@@ -15,6 +15,7 @@ from phy.gui import create_app, create_gui, run_app
 
 from phycontrib.kwik_gui.gui import (add_waveform_view,
                                      add_trace_view,
+                                     add_feature_view,
                                      add_correlogram_view,
                                      )
 
@@ -66,7 +67,7 @@ def on_request_save(spike_clusters, groups):
 
 # Views
 add_waveform_view(gui)
-# add_feature_view(gui)
+add_feature_view(gui)
 add_correlogram_view(gui)
 add_amplitude_view(gui)
 tv = add_trace_view(gui)

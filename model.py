@@ -5,7 +5,7 @@ import scipy.io as sio
 
 from phy.cluster.manual.views import select_traces
 from phy.io import Context, Selector
-from phy.io.array import _spikes_in_clusters, concat_per_cluster
+from phy.io.array import _spikes_in_clusters, concat_per_cluster, _get_data_lim
 from phy.utils import Bunch
 from phy.traces import SpikeLoader, WaveformLoader
 from phy.traces.filter import apply_filter, bandpass_filter
@@ -25,8 +25,11 @@ filenames = {
     'channel_positions_x': 'xcoords.npy',
     'channel_positions_y': 'ycoords.npy',
     'whitening_matrix': 'whiteningMatrix.npy',
-    # '': 'Fs.mat',
-    # '': 'connected.mat',
+
+    'features': 'pcFeatures.npy',
+    'features_ind': 'pcFeatureInds.npy',
+    'template_features': 'templateFeatures.npy',
+    'template_features_ind': 'templateFeatureInds.npy',
 }
 
 
@@ -129,6 +132,14 @@ def get_model():
                               read_array('channel_positions_y')]
     assert channel_positions.shape == (n_channels, 2)
 
+    all_features = np.load(filenames['features'], mmap_mode='r')
+    features_ind = np.load(filenames['features_ind'], mmap_mode='r')
+
+    template_features = np.load(filenames['template_features'],
+                                mmap_mode='r')
+    template_features_ind = np.load(filenames['template_features_ind'],
+                                    mmap_mode='r')
+
     model = Bunch()
     model.n_channels = n_channels
     # Take dead channels into account.
@@ -143,6 +154,7 @@ def get_model():
     model.templates = templates
     model.n_samples_templates = n_samples_templates
     model.template_lim = np.max(np.abs(model.templates))
+    model.n_templates = len(model.templates)
 
     model.sample_rate = sample_rate
     model.duration = n_samples_t / float(model.sample_rate)
@@ -177,10 +189,8 @@ def get_model():
 
     model.template_masks = get_masks(templates)
     model.all_masks = MaskLoader(model.template_masks, spike_clusters)
-    # model.features = None
-    # model.features_masks = None
 
-    model.n_features_per_channel = 1
+    model.n_features_per_channel = 3
     model.n_samples_waveforms = n_samples_waveforms
     model.cluster_groups = {c: None for c in range(n_clusters)}
 
@@ -196,6 +206,53 @@ def get_model():
 
     selector = Selector(model.spikes_per_cluster)
     create_cluster_store(model, selector=selector, context=context)
+
+    def select(cluster_id, n=None):
+        assert isinstance(cluster_id, int)
+        assert cluster_id >= 0
+        return selector.select_spikes([cluster_id], max_n_spikes_per_cluster=n)
+
+    def _get_data(**kwargs):
+        kwargs['spike_clusters'] = model.spike_clusters[kwargs['spike_ids']]
+        return Bunch(**kwargs)
+
+    # Check sparse features arrays shapes.
+    assert all_features.ndim == 3
+    n_loc_chan = all_features.shape[2]
+    assert all_features.shape == (model.n_spikes,
+                                  model.n_features_per_channel,
+                                  n_loc_chan,
+                                  )
+    assert features_ind.shape == (n_loc_chan, model.n_templates)
+
+    @concat_per_cluster
+    @context.cache
+    def features(cluster_id):
+        spike_ids = select(cluster_id, 1000)
+        nc = model.n_channels
+        nfpc = model.n_features_per_channel
+        ns = len(spike_ids)
+        shape = (ns, nc, nfpc)
+        f = np.zeros(shape)
+        # Sparse channels.
+        ch = features_ind[:, cluster_id]
+        # Populate the dense features array.
+        f[:, ch, :] = np.transpose(all_features[spike_ids, :, :], (0, 2, 1))
+        m = model.masks(cluster_id).masks
+        return _get_data(spike_ids=spike_ids,
+                         features=f,
+                         masks=m,
+                         )
+    model.features = features
+
+    model.background_features = lambda: None
+
+    @context.memcache
+    @context.cache
+    def feature_lim():
+        """Return the max of a subset of the feature amplitudes."""
+        return _get_data_lim(all_features, 1000)
+    model.feature_lim = feature_lim
 
     @concat_per_cluster
     @context.cache
