@@ -48,7 +48,7 @@ gui.model = model
 # Create the manual clustering.
 mc = ManualClustering(model.spike_clusters,
                       model.spikes_per_cluster,
-                      similarity=model.probe_distance,
+                      similarity=model.similarity,
                       cluster_groups=model.cluster_groups,
                       )
 mc.add_column(model.probe_depth)

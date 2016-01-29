@@ -148,13 +148,21 @@ def get_model():
 
     # Amplitudes
     model.all_amplitudes = amplitudes
-    model.amplitudes_lim = np.percentile(model.all_amplitudes, 99.9)
+    model.amplitudes_lim = np.percentile(model.all_amplitudes, 100)
 
     # Templates
     model.templates = templates
     model.n_samples_templates = n_samples_templates
     model.template_lim = np.max(np.abs(model.templates))
     model.n_templates = len(model.templates)
+
+    def similarity(cluster_id):
+        n = model.template_features_ind.shape[1]
+        sim = model.template_features_ind[cluster_id - 1]
+        sim = [(int(c), -n - i) for i, c in enumerate(sim)]
+        sim.extend(model.probe_distance(cluster_id))
+        return sim
+    model.similarity = similarity
 
     model.sample_rate = sample_rate
     model.duration = n_samples_t / float(model.sample_rate)
@@ -228,6 +236,7 @@ def get_model():
     n_sim_tem = template_features.shape[1]
     assert template_features.shape == (n_spikes, n_sim_tem)
     assert template_features_ind.shape == (n_templates, n_sim_tem)
+    model.template_features_ind = template_features_ind
 
     @concat_per_cluster
     @context.cache
