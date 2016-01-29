@@ -112,8 +112,7 @@ def get_model():
     amplitudes = read_array('amplitudes').squeeze()
     n_spikes, = amplitudes.shape
 
-    spike_clusters = read_array('spike_clusters').squeeze()
-    spike_clusters -= 1  # 1 -> n_templates
+    spike_clusters = read_array('spike_clusters').squeeze().astype(np.int32)
     assert spike_clusters.shape == (n_spikes,)
 
     spike_samples = read_array('spike_samples').squeeze()
@@ -132,12 +131,12 @@ def get_model():
     assert channel_positions.shape == (n_channels, 2)
 
     all_features = np.load(filenames['features'], mmap_mode='r')
-    features_ind = np.load(filenames['features_ind'], mmap_mode='r')
+    features_ind = read_array('features_ind').astype(np.int32)
 
     template_features = np.load(filenames['template_features'],
                                 mmap_mode='r')
-    template_features_ind = np.load(filenames['template_features_ind'],
-                                    mmap_mode='r')
+    template_features_ind = read_array('template_features_ind'). \
+        astype(np.int32)
     template_features_ind = template_features_ind.T.copy()
 
     model = Bunch()
@@ -158,9 +157,11 @@ def get_model():
 
     def similarity(cluster_id):
         n = model.template_features_ind.shape[1]
-        sim = model.template_features_ind[cluster_id - 1]
-        sim = [(int(c), -n - i) for i, c in enumerate(sim)]
-        sim.extend(model.probe_distance(cluster_id))
+        sim0 = model.template_features_ind[cluster_id]
+        sim = [(int(c), -n + i) for i, c in enumerate(sim0)]
+        sim2 = model.probe_distance(cluster_id)
+        sim2 = [_ for _ in sim2 if _[0] not in sim0]
+        sim.extend(sim2)
         return sim
     model.similarity = similarity
 
@@ -248,7 +249,7 @@ def get_model():
         shape = (ns, nc, nfpc)
         f = np.zeros(shape)
         # Sparse channels.
-        ch = features_ind[:, cluster_id] - 1
+        ch = features_ind[:, cluster_id]
         # Populate the dense features array.
         f[:, ch, :] = np.transpose(all_features[spike_ids, :, :], (0, 2, 1))
         m = model.masks(cluster_id).masks
@@ -288,8 +289,8 @@ def get_model():
         assert template_features.shape == (n_spikes, n_sim_tem)
         assert template_features_ind.shape == (n_templates, n_sim_tem)
         cx, cy = map(int, cluster_ids[:2])
-        sim_x = template_features_ind[cx - 1].tolist()
-        sim_y = template_features_ind[cy - 1].tolist()
+        sim_x = template_features_ind[cx].tolist()
+        sim_y = template_features_ind[cy].tolist()
         if cx not in sim_y or cy not in sim_x:
             return None
         sxy = sim_x.index(cy)
