@@ -12,6 +12,7 @@ import logging
 from phy.cluster.manual.gui_component import ManualClustering
 from phy.cluster.manual.views import ScatterView
 from phy.gui import create_app, create_gui, run_app
+from phy import add_default_handler
 
 from phycontrib.kwik_gui.gui import (add_waveform_view,
                                      add_trace_view,
@@ -22,6 +23,9 @@ from phycontrib.kwik_gui.gui import (add_waveform_view,
 from model import get_model
 
 logging.getLogger(__name__).setLevel('DEBUG')
+
+
+add_default_handler('DEBUG')
 
 
 # -----------------------------------------------------------------------------

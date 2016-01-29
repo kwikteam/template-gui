@@ -5,7 +5,10 @@ import scipy.io as sio
 
 from phy.cluster.manual.views import select_traces
 from phy.io import Context, Selector
-from phy.io.array import _spikes_in_clusters, concat_per_cluster, _get_data_lim
+from phy.io.array import (_spikes_in_clusters,
+                          concat_per_cluster,
+                          _get_data_lim,
+                          )
 from phy.utils import Bunch
 from phy.traces import SpikeLoader, WaveformLoader
 from phy.traces.filter import apply_filter, bandpass_filter
@@ -67,18 +70,14 @@ class MaskLoader(object):
 def subtract_templates(traces,
                        start=None,
                        spike_times=None,
+                       spike_clusters=None,
                        amplitudes=None,
                        spike_templates=None,
-                       whitening_matrix=None,
                        sample_rate=None,
-                       scaling_factor=1.):
+                       ):
     traces = traces.copy()
     st = spike_times
-    wm = whitening_matrix * scaling_factor
-    temp = spike_templates
-    temp = np.dot(temp, np.linalg.inv(wm))
-    amp = amplitudes
-    w = temp * amp[:, np.newaxis, np.newaxis]
+    w = spike_templates * amplitudes[:, np.newaxis, np.newaxis]
     n = traces.shape[0]
     for index in range(w.shape[0]):
         t = int(round((st[index] - start) * sample_rate))
@@ -149,7 +148,7 @@ def get_model():
 
     # Amplitudes
     model.all_amplitudes = amplitudes
-    model.amplitudes_lim = np.percentile(model.all_amplitudes, 95)
+    model.amplitudes_lim = np.percentile(model.all_amplitudes, 99.9)
 
     # Templates
     model.templates = templates
@@ -301,6 +300,10 @@ def get_model():
     m, M = tf.min(), tf.max()
     model.template_features_bounds = [m, m, M, M]
 
+    wmi = np.linalg.inv(model.whitening_matrix / 200.)
+    # Unwhiten the templates.
+    model.templates_unw = np.dot(model.templates, wmi)
+
     def traces(interval):
         """Load traces and spikes in an interval."""
         tr = select_traces(model.all_traces, interval,
@@ -315,11 +318,11 @@ def get_model():
         tr_sub = subtract_templates(tr,
                                     start=interval[0],
                                     spike_times=model.spike_times[a:b],
+                                    spike_clusters=sc,
                                     amplitudes=model.all_amplitudes[a:b],
-                                    spike_templates=model.templates[sc],
-                                    whitening_matrix=model.whitening_matrix,
+                                    spike_templates=model.templates_unw[sc],
                                     sample_rate=model.sample_rate,
-                                    scaling_factor=1. / 200)
+                                    )
 
         return [Bunch(traces=tr),
                 Bunch(traces=tr_sub, color=(.25, .25, .25, .75))]
