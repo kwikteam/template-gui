@@ -5,7 +5,7 @@ import logging
 import numpy as np
 
 from phy.gui import create_app, run_app
-from phycontrib.template import create_template_gui
+from phycontrib.template import create_template_gui, TemplateController
 
 
 logger = logging.getLogger(__name__)
@@ -17,6 +17,11 @@ kwargs = dict(
     n_samples_waveforms=30,
     dtype=np.int16,
 )
+
+# tc = TemplateController(**kwargs)
+# d = tc.get_features([10])
+# print(d)
+# exit()
 
 create_app()
 plugins = ['SaveGeometryStatePlugin',
