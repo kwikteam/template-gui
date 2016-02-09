@@ -4,21 +4,17 @@ import logging
 
 import numpy as np
 
+from phy.utils._misc import _read_python
 from phy.gui import create_app, run_app
 from phycontrib.template import create_template_gui, TemplateController
 
 
 logger = logging.getLogger(__name__)
 
-kwargs = dict(
-    dat_path='20151102_1.dat',
-    n_channels_dat=129,
-    sample_rate=25000.,
-    n_samples_waveforms=30,
-    dtype=np.int16,
-)
+params = _read_python('params.py')
+params['dtype'] = getattr(np, params['dtype'], 'int16')
 
-# tc = TemplateController(**kwargs)
+# tc = TemplateController(**params)
 # d = tc.get_features([10])
 # print(d)
 # exit()
@@ -26,7 +22,7 @@ kwargs = dict(
 create_app()
 plugins = ['SaveGeometryStatePlugin',
            ]
-gui = create_template_gui(plugins=plugins, **kwargs)
+gui = create_template_gui(plugins=plugins, **params)
 
 gui.show()
 run_app()
